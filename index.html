@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리동네가로수 사용성 평가 설문</title>
+<link rel="stylesheet" href="assets/app.css?v=1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/config.js?v=1"></script>
+<script src="assets/items.js?v=1"></script>
+<script src="assets/stats.js?v=1"></script>
+<script src="assets/api.js?v=1"></script>
+</head>
+<body class="leaf-bg">
+<main class="wrap">
+  <header class="hero">
+    <h1>「우리동네가로수」 서비스 사용성 평가</h1>
+    <p id="sess-title">전북대학교 미디어커뮤니케이션학과</p>
+  </header>
+
+  <p id="loading" class="card muted">불러오는 중…</p>
+
+  <section id="v-code" class="card hidden">
+    <label class="field"><span>참여 코드</span>
+      <input id="code-in" autocomplete="off" autocapitalize="characters" placeholder="진행자가 알려 준 코드를 입력하세요"></label>
+    <button class="primary block" id="code-go">입장</button>
+    <p id="code-err" class="err" role="alert"></p>
+    <p class="small muted" style="text-align:center;margin:14px 0 0;border-top:1px solid var(--grid);padding-top:12px">
+      진행자이신가요? <a href="admin.html">진행자 콘솔로 이동 →</a></p>
+  </section>
+
+  <section id="v-intro" class="card hidden">
+    <h2>연구 안내</h2>
+    <p>안녕하십니까? 본 설문은 전주 가로수와 ‘친구’를 맺어 돌보고 생활 속 기후 보호 실천을 기록하는 웹 서비스 <b>‘우리동네가로수’</b>를 처음 사용해 본 경험을 평가하기 위한 것입니다.</p>
+    <p>참여하시면 먼저 짧은 시작 문항에 답한 뒤, <b>5분 동안 서비스의 주요 기능 4가지를 직접 사용</b>해 보고, 이어서 설문에 응답하게 됩니다. 전체 소요 시간은 약 25분입니다.</p>
+    <p>설문에는 정답이 없으며, 느끼신 그대로 답해 주시면 됩니다. 응답은 익명으로 처리되고 연구 목적으로만 사용되며, 통계적으로 분석되어 개인을 알아볼 수 없습니다. 참여는 자발적이며 언제든 불이익 없이 중단하실 수 있습니다.</p>
+    <p class="small ink2">연구책임자: [이름] · 연락처: [연락처] · IRB 승인번호: [번호]</p>
+    <label class="opt consent"><input type="checkbox" id="consent"><span>위 내용을 읽고 이해했으며, 본 연구에 참여하는 것에 동의합니다.</span></label>
+    <label class="field" style="margin-top:12px"><span>참여자 번호 (진행자가 알려 준 경우에만 입력, 선택)</span><input id="pnum" autocomplete="off" maxlength="12" placeholder="예: 7"></label>
+    <button class="primary block" id="start">설문 시작</button>
+    <p id="intro-err" class="err" role="alert"></p>
+  </section>
+
+  <form id="v-part" class="hidden" novalidate>
+    <div class="progress">
+      <div class="track"><div class="fill" id="pfill"></div></div>
+      <div class="txt" id="ptxt"></div>
+    </div>
+    <h2 class="part-title" id="part-title"></h2>
+    <p class="small ink2" id="part-lead"></p>
+    <div id="questions"></div>
+    <div class="row" style="margin-top:14px">
+      <button type="button" id="prev" class="hidden">이전</button>
+      <button class="primary grow" type="submit" id="next">다음</button>
+    </div>
+    <p id="form-err" class="err" role="alert"></p>
+  </form>
+
+  <section id="v-lock" class="card hidden">
+    <h2>서비스 사용해 보기</h2>
+    <p>이제 <b>우리동네가로수</b>를 직접 써 보세요. 아래 과업을 순서대로 해 보시고, 남는 시간에는 자유롭게 둘러보세요. <b>5분</b>이 지나면 다음 설문으로 넘어갈 수 있습니다.</p>
+    <ol class="tasklist" id="tasklist"></ol>
+    <a class="btn primary block" id="open-app" href="#" target="_blank" rel="noopener">우리동네가로수 열기 ↗</a>
+    <p class="small muted" style="text-align:center;margin:6px 0 0">새 탭(또는 새 창)으로 열립니다. 다 쓰신 뒤 이 화면으로 돌아오세요.</p>
+    <div class="timerbox">
+      <div class="timer" id="timer">5:00</div>
+      <div class="track"><div class="fill" id="lockfill"></div></div>
+      <p class="small ink2" id="timer-hint">남은 시간이 0이 되면 ‘다음 설문으로’ 버튼이 열립니다.</p>
+    </div>
+    <button class="primary block" id="lock-next" disabled>다음 설문으로</button>
+  </section>
+
+  <section id="v-done" class="card hidden">
+    <h2>제출했습니다 ✓</h2>
+    <p>설문에 응답해 주셔서 감사합니다. 이 창을 닫으셔도 됩니다.</p>
+    <a id="done-link" class="btn primary block hidden" href="#">결과 보기</a>
+  </section>
+
+  <section id="v-msg" class="card hidden">
+    <p id="msg"></p>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const VIEWS = ['v-code', 'v-intro', 'v-part', 'v-lock', 'v-done', 'v-msg'];
+  const show = id => { $('loading').classList.add('hidden'); VIEWS.forEach(v => $(v).classList.toggle('hidden', v !== id)); scrollTo(0, 0); };
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
+  };
+  const demoQ = GS_API.DEMO ? '&demo=1' : '';
+  const LOCK_SECONDS = GS_API.DEMO ? 15 : (GS_CONFIG.LOCK_SECONDS || 300);
+
+  let code = (new URLSearchParams(location.search).get('s') || '').trim().toUpperCase();
+  const draftKey = () => 'gs_draft_' + code;
+  const doneKey = () => 'gs_done_' + code;
+  // 기기마다 하나의 익명 참여 토큰. 이름·학번은 받지 않는다
+  const newPid = () => { const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; return Array.from({ length: 8 }, () => A[Math.floor(Math.random() * A.length)]).join(''); };
+  let d = null; // 진행 상태(초안): { pid, pnum, step, ans, lockStart, appOpened, preSent }
+
+  // ---------- 진입 ----------
+  async function enter() {
+    if (!code) { show('v-code'); $('code-in').focus(); return; }
+    let info;
+    try { info = await GS_API.sessionInfo(code); }
+    catch (e) { show('v-code'); $('code-err').textContent = e.message; return; }
+    if (!info) { show('v-code'); $('code-in').value = code; $('code-err').textContent = '참여 코드를 찾을 수 없습니다. 다시 확인해 주세요.'; return; }
+    if (info.title) $('sess-title').textContent = info.title;
+    if (store.get(doneKey())) return showDone();
+    if (info.status !== 'open') return showMsg('설문이 종료되었습니다.');
+    d = store.get(draftKey());
+    if (d && d.step > 0) { render(); return; } // 이어서 하기
+    if (d) $('pnum').value = d.pnum || '';
+    show('v-intro');
+  }
+  $('code-go').onclick = () => {
+    code = $('code-in').value.trim().toUpperCase();
+    if (!code) return;
+    history.replaceState(null, '', `?s=${encodeURIComponent(code)}${demoQ}`);
+    $('code-err').textContent = '';
+    enter();
+  };
+  $('code-in').onkeydown = e => { if (e.key === 'Enter') $('code-go').click(); };
+
+  $('start').onclick = () => {
+    if (!$('consent').checked) { $('intro-err').textContent = '참여에 동의하셔야 시작할 수 있습니다.'; return; }
+    $('intro-err').textContent = '';
+    d = d || { pid: newPid(), step: 0, ans: {}, lockStart: null, appOpened: 0, preSent: false };
+    d.pnum = $('pnum').value.trim().slice(0, 12);
+    d.consentAt = new Date().toISOString();
+    save();
+    render();
+  };
+  const save = () => store.set(draftKey(), d);
+
+  // ---------- 문항 그리기 ----------
+  const part = () => GS.PARTS[d.step];
+  let num = 0;
+  const card = (key, inner, qtext) => `<div class="card q" data-q="${esc(key)}"><div class="qtext"><span class="qnum">${++num}.</span>${qtext}</div>${inner}</div>`;
+  const checked = (id, v) => (d.ans[id] === v ? 'checked' : '');
+
+  function renderItem(i) {
+    if (i.type === 'note') return `<p class="note-line">${esc(i.text)}</p>`;
+    if (i.type === 'single') {
+      const opts = i.options.map(([v, label]) => `<label class="opt"><input type="radio" name="${i.id}" value="${v}" ${checked(i.id, v)}><span>${esc(label)}</span></label>`).join('');
+      const other = i.other ? `<label class="field other"><span>기타라면 적어 주세요</span><input name="${i.id}_other" maxlength="40" value="${esc(d.ans[i.id + '_other'] || '')}"></label>` : '';
+      return card(i.id, `<div class="opts">${opts}</div>${other}`, esc(i.text));
+    }
+    if (i.type === 'likert') {
+      const sc = GS.SCALES[i.scale];
+      const segs = sc.map(([v, label]) => `<label class="seg"><input type="radio" name="${i.id}" value="${v}" ${checked(i.id, v)} aria-label="${v}${label ? ' ' + esc(label) : ''}"><span>${v}</span></label>`).join('');
+      const ends = `<div class="ends"><span>${esc(sc[0][1])}</span><span>${esc(sc[sc.length - 1][1])}</span></div>`;
+      return card(i.id, `<div class="segs n${sc.length}">${segs}</div>${ends}`, esc(i.text));
+    }
+    if (i.type === 'sd') {
+      const segs = [1, 2, 3, 4, 5, 6, 7].map(v => `<label class="seg"><input type="radio" name="${i.id}" value="${v}" ${checked(i.id, v)} aria-label="${esc(i.left)}–${esc(i.right)} ${v}"><span>${v}</span></label>`).join('');
+      return card(i.id, `<div class="sd"><span class="sdl">${esc(i.left)}</span><div class="segs n7">${segs}</div><span class="sdr">${esc(i.right)}</span></div>`, `<span class="muted small" style="font-weight:400">${esc(i.left)} ↔ ${esc(i.right)}</span>`);
+    }
+    if (i.type === 'text') return card(i.id, `<textarea name="${i.id}" rows="3" maxlength="1000" placeholder="(선택)">${esc(d.ans[i.id] || '')}</textarea>`, esc(i.text));
+    if (i.type === 'year') return card(i.id, `<div class="row"><input name="${i.id}" type="number" inputmode="numeric" min="1930" max="2015" style="width:140px" value="${esc(d.ans[i.id] ?? '')}"><span>년</span></div>`, esc(i.text));
+    return '';
+  }
+
+  function render() {
+    const p = part();
+    if (!p) return;
+    if (p.type === 'lock') return renderLock();
+    num = 0;
+    $('part-title').textContent = p.title;
+    $('part-lead').textContent = p.lead || '';
+    $('questions').innerHTML = p.items.map(renderItem).join('');
+    $('prev').classList.toggle('hidden', d.step === 0 || GS.PARTS[d.step - 1].type === 'lock');
+    $('next').textContent = d.step === GS.PARTS.length - 1 ? '제출하기' : (p.stage === 'pre' ? '저장하고 서비스 사용하기' : '다음');
+    $('form-err').textContent = '';
+    updateProgress();
+    show('v-part');
+  }
+
+  $('questions').addEventListener('input', e => {
+    const el = e.target;
+    if (!el.name) return;
+    if (el.type === 'radio') d.ans[el.name] = Number(el.value);
+    else if (el.type === 'number') d.ans[el.name] = el.value ? Number(el.value) : null;
+    else d.ans[el.name] = el.value;
+    const q = el.closest('.q');
+    if (q && q.classList.contains('missing') && answered(q.dataset.q)) q.classList.remove('missing');
+    save();
+    updateProgress();
+  });
+
+  const findItem = id => GS.ALL_ITEMS.find(i => i.id === id);
+  function answered(id) {
+    const i = findItem(id);
+    if (!i) return true;
+    if (i.type === 'text') return true;
+    if (i.type === 'year') return Number.isInteger(d.ans[id]) && d.ans[id] >= 1930 && d.ans[id] <= 2015;
+    return d.ans[id] !== undefined && d.ans[id] !== null;
+  }
+  const allRequired = [...GS.requiredKeys('pre'), ...GS.requiredKeys('post')];
+  function updateProgress() {
+    const done = allRequired.filter(answered).length;
+    $('pfill').style.width = (done / allRequired.length * 100) + '%';
+    const stageNo = GS.PARTS.filter((p, k) => k <= d.step && p.type !== 'lock').length;
+    const stageAll = GS.PARTS.filter(p => p.type !== 'lock').length;
+    $('ptxt').textContent = `${stageNo} / ${stageAll} 단계 · ${done} / ${allRequired.length} 응답`;
+  }
+
+  $('prev').onclick = () => { d.step = Math.max(0, d.step - 1); save(); render(); };
+
+  $('v-part').addEventListener('submit', async e => {
+    e.preventDefault();
+    const p = part();
+    let first = null;
+    for (const i of p.items) {
+      if (!i.id) continue;
+      const q = document.querySelector(`.q[data-q="${i.id}"]`);
+      const ok = answered(i.id);
+      q.classList.toggle('missing', !ok);
+      if (!ok && !first) first = q;
+    }
+    if (first) { $('form-err').textContent = '빠진 문항이 있습니다. 빨간 테두리 문항을 확인해 주세요.'; first.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    $('form-err').textContent = '';
+    if (p.stage === 'pre') return sendPre();
+    if (d.step === GS.PARTS.length - 1) return sendPost();
+    d.step++; save(); render();
+  });
+
+  const pick = stage => Object.fromEntries(Object.entries(d.ans).filter(([k]) => { const base = k.replace(/_other$/, ''); const i = findItem(base); return i && GS.PARTS.find(p => p.items?.includes(i))?.stage === stage; }));
+  async function busy(on, label) { $('next').disabled = on; if (label) $('next').textContent = label; }
+
+  // 시작 문항은 서비스를 쓰기 전에 먼저 서버에 저장한다(중간에 그만둬도 남게)
+  async function sendPre() {
+    busy(true, '저장 중…');
+    try {
+      await GS_API.submit(code, d.pid, 'pre', { ...pick('pre'), _pnum: d.pnum || null, _consent_at: d.consentAt, _v: 1 });
+      d.preSent = true; d.step = 1; save(); render();
+    } catch (err) {
+      if (err.code === 'SESSION_CLOSED') return showMsg('설문이 종료되어 제출할 수 없습니다.');
+      $('form-err').textContent = err.message + ' 다시 눌러 주세요.';
+    } finally { busy(false, '저장하고 서비스 사용하기'); }
+  }
+  async function sendPost() {
+    busy(true, '제출 중…');
+    const usage = d.lockLeftAt && d.lockStart ? Math.round((d.lockLeftAt - d.lockStart) / 1000) : null;
+    try {
+      await GS_API.submit(code, d.pid, 'post', { ...pick('post'), _pnum: d.pnum || null, _usage_sec: usage, _app_opened: d.appOpened || 0, _lock_started_at: d.lockStart ? new Date(d.lockStart).toISOString() : null, _v: 1 });
+      store.set(doneKey(), true); store.del(draftKey());
+      showDone();
+    } catch (err) {
+      if (err.code === 'ALREADY_SUBMITTED') { store.set(doneKey(), true); store.del(draftKey()); return showDone(); }
+      if (err.code === 'SESSION_CLOSED') return showMsg('설문이 종료되어 제출할 수 없습니다.');
+      $('form-err').textContent = err.message + ' 다시 눌러 주세요.';
+      busy(false, '제출하기');
+    }
+  }
+
+  // ---------- 서비스 사용 잠금(5분) ----------
+  let tick = null;
+  function renderLock() {
+    show('v-lock');
+    $('tasklist').innerHTML = GS.TASKS.map(t => `<li><b>${esc(t.title)}</b><br>${esc(t.text)}</li>`).join('') + '<li><b>자유 탐색</b><br>남는 시간에는 서비스를 자유롭게 둘러보세요.</li>';
+    $('open-app').href = GS.APP_URL;
+    if (!d.lockStart) { d.lockStart = Date.now(); save(); }
+    $('timer-hint').textContent = GS_API.DEMO ? '데모 모드: 15초 뒤에 열립니다.' : '남은 시간이 0이 되면 ‘다음 설문으로’ 버튼이 열립니다. 서비스를 쓰는 동안에도 시간은 흐릅니다.';
+    clearInterval(tick);
+    tick = setInterval(updateLock, 1000);
+    updateLock();
+  }
+  function updateLock() {
+    const elapsed = Math.floor((Date.now() - d.lockStart) / 1000);
+    const left = Math.max(0, LOCK_SECONDS - elapsed);
+    $('timer').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+    $('lockfill').style.width = `${Math.min(100, elapsed / LOCK_SECONDS * 100)}%`;
+    const open = left === 0;
+    $('lock-next').disabled = !open;
+    $('lock-next').textContent = open ? '다음 설문으로 →' : `다음 설문으로 (${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} 남음)`;
+    if (open) clearInterval(tick);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && d && part()?.type === 'lock') updateLock(); });
+  $('open-app').addEventListener('click', () => { d.appOpened = (d.appOpened || 0) + 1; save(); });
+  $('lock-next').onclick = () => {
+    if (Date.now() - d.lockStart < LOCK_SECONDS * 1000) return;
+    d.lockLeftAt = Date.now(); d.step++; save(); render();
+  };
+
+  // ---------- 완료 ----------
+  function showDone() {
+    show('v-done');
+    const poll = async () => {
+      try {
+        const info = await GS_API.sessionInfo(code);
+        if (info && info.status === 'closed' && info.n >= (GS_CONFIG.MIN_N || 3)) {
+          $('done-link').href = `results.html?s=${encodeURIComponent(code)}${demoQ}`;
+          $('done-link').classList.remove('hidden');
+          return;
+        }
+      } catch {}
+      setTimeout(poll, 15000);
+    };
+    poll();
+  }
+  function showMsg(text) { show('v-msg'); $('msg').textContent = text; }
+
+  enter();
+})();
+</script>
+</body>
+</html>

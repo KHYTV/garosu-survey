@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>결과 · 우리동네가로수 사용성 평가</title>
+<link rel="stylesheet" href="assets/app.css?v=1">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/config.js?v=1"></script>
+<script src="assets/items.js?v=1"></script>
+<script src="assets/stats.js?v=1"></script>
+<script src="assets/api.js?v=1"></script>
+</head>
+<body class="leaf-bg">
+<main class="wrap">
+  <header class="hero"><h1>사용성 평가 결과</h1><p id="sub"></p></header>
+  <p id="loading" class="card muted">불러오는 중…</p>
+  <section id="v-msg" class="card hidden"><p id="msg"></p></section>
+  <div id="v-main" class="hidden"></div>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const code = (new URLSearchParams(location.search).get('s') || '').trim().toUpperCase();
+  let key = null; try { key = sessionStorage.getItem('gs_admin_key'); } catch {}
+  const r2 = v => (v == null ? '–' : (Math.round(v * 100) / 100).toLocaleString('ko-KR'));
+  const mean = arr => { const v = arr.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const sd = arr => { const v = arr.filter(x => x != null); if (v.length < 2) return null; const m = mean(v); return Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1)); };
+
+  function bar(label, value, max, note = '') {
+    const w = value == null ? 0 : Math.max(0, Math.min(100, value / max * 100));
+    return `<div class="rbar"><div class="rl">${esc(label)}</div><div class="rt"><div class="rf" style="width:${w}%"></div></div><div class="rv">${r2(value)}${note}</div></div>`;
+  }
+  function dist(item, answers) {
+    const opts = item.options || GS.SCALES[item.scale];
+    const n = answers.length;
+    return `<div class="card"><div class="qtext">${esc(item.no ? item.no + '. ' : '')}${esc(item.text)}</div>` + opts.map(([v, label]) => {
+      const c = answers.filter(a => a[item.id] === v).length;
+      return bar(`${v}${label ? ' ' + label : ''}`, n ? c / n * 100 : 0, 100, `% (${c})`);
+    }).join('') + '</div>';
+  }
+
+  async function main() {
+    if (!code) return msg('주소에 참여 코드(?s=코드)가 없습니다.');
+    let data;
+    try { data = await GS_API.results(code, key); }
+    catch (e) { return msg(e.code === 'ADMIN_KEY_INVALID' ? '설문이 끝난 뒤에 공개됩니다(진행자는 콘솔에서 접속 후 열어 주세요).' : e.message); }
+    const people = GS_STATS.merge(data.rows);
+    const A = people.filter(m => m.post).map(m => ({ ...(m.pre || {}), ...(m.post || {}) }));
+    const pre = people.filter(m => m.pre).map(m => m.pre);
+    if (A.length < (GS_CONFIG.MIN_N || 3) && !key) return msg(`응답이 ${GS_CONFIG.MIN_N || 3}명 미만이라 결과를 공개하지 않습니다.`);
+    $('sub').textContent = `${data.title || code} · 본 설문 ${A.length}명 · 시작 문항 ${pre.length}명 · ${data.status === 'closed' ? '종료' : '진행 중(진행자 보기)'}`;
+    const sus = A.map(GS.score.sus), ueq = A.map(GS.score.ueq);
+    const html = [];
+    html.push(`<section class="card"><h2>척도 점수 (평균 ± 표준편차)</h2>
+      ${bar('SUS 사용성 점수 (0~100, 68 이상이 평균 이상)', mean(sus), 100, ` ± ${r2(sd(sus))}`)}
+      ${bar('UEQ-S 실용적 품질 (−3~+3)', mean(ueq.map(u => u.pragmatic)) + 3, 6, ` → ${r2(mean(ueq.map(u => u.pragmatic)))}`)}
+      ${bar('UEQ-S 쾌락적 품질 (−3~+3)', mean(ueq.map(u => u.hedonic)) + 3, 6, ` → ${r2(mean(ueq.map(u => u.hedonic)))}`)}
+      ${bar('유용성 PU (1~7)', mean(A.map(GS.score.pu)), 7, ` ± ${r2(sd(A.map(GS.score.pu)))}`)}
+      ${bar('사용 용이성 PEOU (1~7)', mean(A.map(GS.score.peou)), 7, ` ± ${r2(sd(A.map(GS.score.peou)))}`)}
+      ${bar('태도 ATT (1~7)', mean(A.map(GS.score.att)), 7, ` ± ${r2(sd(A.map(GS.score.att)))}`)}
+      ${bar('지속 사용 의도 CI (1~7)', mean(A.map(GS.score.ci)), 7, ` ± ${r2(sd(A.map(GS.score.ci)))}`)}
+      <p class="small muted">UEQ-S 막대는 −3~+3을 0~6으로 옮겨 그린 것이고 오른쪽 숫자가 실제 값입니다.</p></section>`);
+    html.push(`<section class="card"><h2>과업별 난이도 SEQ (1 매우 어렵다 ~ 7 매우 쉽다)</h2>` +
+      GS.TASKS.map((t, k) => { const v = A.map(a => a[`SEQ${k + 1}`]); const done = A.filter(a => a[`SEQ${k + 1}_done`] === 1).length;
+        return bar(t.title, mean(v), 7, ` · 혼자 완료 ${A.length ? Math.round(done / A.length * 100) : 0}%`); }).join('') + '</section>');
+    html.push(`<section class="card"><h2>첫인상·정보 이해 (1~5)</h2>` + GS.itemsOf('post').filter(i => /^FI/.test(i.id)).map(i => bar(`${i.no}. ${i.text}`, mean(A.map(a => a[i.id])), 5)).join('') +
+      `<p class="small">49. "감축량은 내 행동으로 실제 줄어든 탄소의 양이다" → 정답(아니오) ${A.length ? Math.round(A.filter(a => a.DK1 === 2).length / A.length * 100) : 0}% · 50. '검증 전/추정' 표시를 봤다 ${A.length ? Math.round(A.filter(a => a.DK2 === 1).length / A.length * 100) : 0}%</p></section>`);
+    html.push(`<section class="card"><h2>서비스 사용 시간</h2><p>잠금 화면에 머문 시간 평균 ${r2(mean(A.map(a => a._usage_sec)) / 60)}분 · 서비스 열기 버튼 평균 ${r2(mean(A.map(a => a._app_opened)))}회</p></section>`);
+    html.push('<h2 class="part-title">시작 문항(기후변화 인식) 분포</h2>');
+    for (const i of GS.itemsOf('pre')) html.push(dist(i, pre));
+    const oe = GS.itemsOf('post').filter(i => i.type === 'text');
+    html.push('<h2 class="part-title">자유 의견</h2>');
+    for (const i of oe) {
+      const texts = A.map(a => (a[i.id] || '').trim()).filter(Boolean);
+      html.push(`<section class="card"><div class="qtext">${esc(i.no)}. ${esc(i.text)}</div>${texts.length ? '<ul>' + texts.map(t => `<li>${esc(t)}</li>`).join('') + '</ul>' : '<p class="muted">응답 없음</p>'}</section>`);
+    }
+    $('v-main').innerHTML = html.join('');
+    $('loading').classList.add('hidden');
+    $('v-main').classList.remove('hidden');
+  }
+  function msg(t) { $('loading').classList.add('hidden'); $('v-msg').classList.remove('hidden'); $('msg').textContent = t; }
+  main();
+})();
+</script>
+</body>
+</html>
