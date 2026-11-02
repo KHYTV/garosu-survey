@@ -31,6 +31,12 @@
 1. SQL Editor → `supabase/setup.sql` 전체 붙여넣기 → **맨 아래 `여기에-비밀번호`를 관리자 비밀번호(12자 이상)로 바꾼 뒤** Run.
 2. 다른 프로젝트를 쓰려면 Project Settings → API의 Project URL과 **publishable(anon) 키**를 `assets/config.js`에 넣는다. secret/service_role 키는 절대 넣지 않는다.
 
+### 프로젝트가 멈추지 않게 (keep-alive)
+
+무료 프로젝트는 7일간 요청이 없으면 일시정지된다. `.github/workflows/keepalive.yml`이 **매일 06:00(KST)** 공개 키로 가벼운 조회 1회를 보내 깨어 있게 하고,
+닿지 못하면 작업이 실패해 GitHub가 메일로 알린다 → 대시보드에서 **Restore project**. Actions 탭에서 "Run workflow"로 수동 실행도 된다.
+(GitHub는 저장소에 60일간 커밋이 없으면 예약 작업을 멈추므로, 그때는 Actions 탭에서 다시 켠다.)
+
 ## 2. 리허설
 
 1. `admin.html` → 관리자 비밀번호 → 테스트 세션 만들기 → QR로 참여 → 끝까지 제출
