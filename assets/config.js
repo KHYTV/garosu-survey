@@ -8,4 +8,5 @@ window.GS_CONFIG = {
   SUPABASE_KEY: 'sb_publishable_X0PsntbEoDODj9LLRZi1-Q_D2tCrjwS',
   LOCK_SECONDS: 300,   // 서비스 사용 잠금 시간(5분). 주소에 demo=1이면 15초
   MIN_N: 3,            // 응답이 이보다 적으면 결과 화면을 공개하지 않음
+  PNUM_REQUIRED: true, // 참여자 번호(진행자가 준 번호)를 시작 전에 필수로 받고, 제출 직전에 다시 확인
 };

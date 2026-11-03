@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>진행자 콘솔 · 우리동네가로수 사용성 평가</title>
-<link rel="stylesheet" href="assets/app.css?v=1">
+<link rel="stylesheet" href="assets/app.css?v=2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-<script src="assets/config.js?v=1"></script>
-<script src="assets/items.js?v=1"></script>
-<script src="assets/stats.js?v=1"></script>
-<script src="assets/api.js?v=1"></script>
+<script src="assets/config.js?v=2"></script>
+<script src="assets/items.js?v=2"></script>
+<script src="assets/stats.js?v=2"></script>
+<script src="assets/api.js?v=2"></script>
 </head>
 <body class="leaf-bg">
 <main class="wrap wide">
@@ -58,7 +58,7 @@
           <button id="b-full">QR 크게 띄우기</button>
         </div>
         <div class="row" style="margin-top:10px">
-          <button id="b-roster">참여 현황 CSV</button>
+          <button id="b-roster" title="참여 토큰별 참여자 번호·문항 버전·제출 시각. 참여자 번호 없는 응답을 찾을 때">참여 현황 CSV</button>
           <button id="b-raw" title="통계분석용 익명 원자료: 응답자 1명 = 1행, 모든 문항과 척도 점수">응답 원자료 CSV</button>
           <button id="b-codebook" title="원자료 변수 이름과 값의 뜻">코드북</button>
           <button id="b-sassy">SASSY 분류용 CSV</button>
@@ -205,7 +205,13 @@
   $('b-roster').onclick = async () => {
     try {
       const list = await GS_API.adminRoster(key, cur.code);
-      GS_STATS.download(`참여현황_${cur.code}.csv`, GS_STATS.toCsv([['참여 토큰', '시작 문항 제출', '본 설문 제출'], ...list.map(r => [r.pid, GS_STATS.stamp(r.pre_at), GS_STATS.stamp(r.post_at)])]), true);
+      // 참여자 번호·문항 버전은 응답 본문에 있으므로 원자료에서 가져와 붙인다
+      const data = await GS_API.results(cur.code, key);
+      const by = new Map(GS_STATS.merge(data.rows).map(m => [m.pid, m]));
+      const rows = list.map(r => { const m = by.get(r.pid) || {}; return [r.pid, GS_STATS.pnumOf(m), GS_STATS.itemsV(m.pre), GS_STATS.itemsV(m.post), GS_STATS.stamp(r.pre_at), GS_STATS.stamp(r.post_at)]; });
+      GS_STATS.download(`참여현황_${cur.code}.csv`, GS_STATS.toCsv([['참여 토큰', '참여자 번호', '문항 버전(시작)', '문항 버전(본 설문)', '시작 문항 제출', '본 설문 제출'], ...rows]), true);
+      const missing = rows.filter(r => !r[1]).length;
+      $('cur-err').textContent = missing ? `참여자 번호 없이 들어온 응답 ${missing}건 — CSV의 제출 시각을 진행자 기록과 맞춰 번호를 확인한 뒤, README ‘참여자 번호 없는 응답 붙이기’의 SQL로 붙일 수 있습니다.` : '';
     } catch (e) { $('cur-err').textContent = e.message; }
   };
   $('b-raw').onclick = async () => {

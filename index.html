@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>우리동네가로수 사용성 평가 설문</title>
-<link rel="stylesheet" href="assets/app.css?v=1">
+<link rel="stylesheet" href="assets/app.css?v=2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="assets/config.js?v=1"></script>
-<script src="assets/items.js?v=1"></script>
-<script src="assets/stats.js?v=1"></script>
-<script src="assets/api.js?v=1"></script>
+<script src="assets/config.js?v=2"></script>
+<script src="assets/items.js?v=2"></script>
+<script src="assets/stats.js?v=2"></script>
+<script src="assets/api.js?v=2"></script>
 </head>
 <body class="leaf-bg">
 <main class="wrap">
@@ -32,11 +32,12 @@
   <section id="v-intro" class="card hidden">
     <h2>연구 안내</h2>
     <p>안녕하십니까? 본 설문은 전주 가로수와 ‘친구’를 맺어 돌보고 생활 속 기후 보호 실천을 기록하는 웹 서비스 <b>‘우리동네가로수’</b>를 처음 사용해 본 경험을 평가하기 위한 것입니다.</p>
-    <p>참여하시면 먼저 짧은 시작 문항에 답한 뒤, <b>5분 동안 서비스의 주요 기능 4가지를 직접 사용</b>해 보고, 이어서 설문에 응답하게 됩니다. 전체 소요 시간은 약 25분입니다.</p>
+    <p>참여하시면 먼저 짧은 시작 문항에 답한 뒤, <b>5분 동안 서비스의 주요 기능 4가지를 직접 사용</b>해 보고, 이어서 설문에 응답하게 됩니다. 전체 소요 시간은 약 15~20분입니다.</p>
     <p>설문에는 정답이 없으며, 느끼신 그대로 답해 주시면 됩니다. 응답은 익명으로 처리되고 연구 목적으로만 사용되며, 통계적으로 분석되어 개인을 알아볼 수 없습니다. 참여는 자발적이며 언제든 불이익 없이 중단하실 수 있습니다.</p>
     <p class="small ink2">연구책임자: [이름] · 연락처: [연락처] · IRB 승인번호: [번호]</p>
     <label class="opt consent"><input type="checkbox" id="consent"><span>위 내용을 읽고 이해했으며, 본 연구에 참여하는 것에 동의합니다.</span></label>
-    <label class="field" style="margin-top:12px"><span>참여자 번호 (진행자가 알려 준 경우에만 입력, 선택)</span><input id="pnum" autocomplete="off" maxlength="12" placeholder="예: 7"></label>
+    <label class="field" style="margin-top:12px"><span id="pnum-label">참여자 번호 (진행자가 알려 준 번호, 필수)</span><input id="pnum" autocomplete="off" maxlength="12" placeholder="예: 7"></label>
+    <p class="small muted" id="pnum-hint" style="margin-top:-4px">번호가 기억나지 않으면 진행자에게 물어본 뒤 입력해 주세요. 응답을 진행자 기록과 맞추는 데만 씁니다.</p>
     <button class="primary block" id="start">설문 시작</button>
     <p id="intro-err" class="err" role="alert"></p>
   </section>
@@ -94,13 +95,17 @@
   };
   const demoQ = GS_API.DEMO ? '&demo=1' : '';
   const LOCK_SECONDS = GS_API.DEMO ? 15 : (GS_CONFIG.LOCK_SECONDS || 300);
+  // 참여자 번호(진행자가 준 번호) 필수 여부. 진행자 기록과 응답을 잇는 유일한 연결고리라 기본은 필수
+  const PNUM_REQUIRED = GS_CONFIG.PNUM_REQUIRED !== false;
+  const cleanPnum = v => String(v || '').trim().slice(0, 12);
+  if (!PNUM_REQUIRED) { $('pnum-label').textContent = '참여자 번호 (진행자가 알려 준 경우에만 입력, 선택)'; $('pnum-hint').classList.add('hidden'); }
 
   let code = (new URLSearchParams(location.search).get('s') || '').trim().toUpperCase();
   const draftKey = () => 'gs_draft_' + code;
   const doneKey = () => 'gs_done_' + code;
   // 기기마다 하나의 익명 참여 토큰. 이름·학번은 받지 않는다
   const newPid = () => { const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; return Array.from({ length: 8 }, () => A[Math.floor(Math.random() * A.length)]).join(''); };
-  let d = null; // 진행 상태(초안): { pid, pnum, step, ans, lockStart, appOpened, preSent }
+  let d = null; // 진행 상태(초안): { pid, pnum, step, ans, lockStart, appOpened, preSent, partV }
 
   // ---------- 진입 ----------
   async function enter() {
@@ -128,14 +133,25 @@
 
   $('start').onclick = () => {
     if (!$('consent').checked) { $('intro-err').textContent = '참여에 동의하셔야 시작할 수 있습니다.'; return; }
+    const pnum = cleanPnum($('pnum').value);
+    if (PNUM_REQUIRED && !pnum) { $('intro-err').textContent = '참여자 번호를 입력해 주세요. 모르면 진행자에게 물어봐 주세요.'; $('pnum').focus(); return; }
     $('intro-err').textContent = '';
     d = d || { pid: newPid(), step: 0, ans: {}, lockStart: null, appOpened: 0, preSent: false };
-    d.pnum = $('pnum').value.trim().slice(0, 12);
+    d.pnum = pnum;
     d.consentAt = new Date().toISOString();
     save();
     render();
   };
   const save = () => store.set(draftKey(), d);
+
+  // ---------- 문항 버전 ----------
+  // 각 부분을 처음 그릴 때의 문항 버전을 기록한다. 기록이 없는데 이미 답이 있으면
+  // 이 기능이 생기기 전(버전 1) 화면에서 답한 것이므로 1로 둔다.
+  function markVersion(p) {
+    d.partV = d.partV || {};
+    if (d.partV[p.id] == null) d.partV[p.id] = p.items.some(i => i.id && d.ans[i.id] != null) ? 1 : GS.ITEMS_VERSION;
+  }
+  const stageV = stage => Math.min(...GS.PARTS.filter(p => p.stage === stage).map(p => (d.partV && d.partV[p.id]) || 1));
 
   // ---------- 문항 그리기 ----------
   const part = () => GS.PARTS[d.step];
@@ -169,10 +185,11 @@
     const p = part();
     if (!p) return;
     if (p.type === 'lock') return renderLock();
+    markVersion(p); save();
     num = 0;
     $('part-title').textContent = p.title;
     $('part-lead').textContent = p.lead || '';
-    $('questions').innerHTML = p.items.map(renderItem).join('');
+    $('questions').innerHTML = p.items.map(renderItem).join('') + (isLast() ? pnumCard() : '');
     $('prev').classList.toggle('hidden', d.step === 0 || GS.PARTS[d.step - 1].type === 'lock');
     $('next').textContent = d.step === GS.PARTS.length - 1 ? '제출하기' : (p.stage === 'pre' ? '저장하고 서비스 사용하기' : '다음');
     $('form-err').textContent = '';
@@ -180,8 +197,19 @@
     show('v-part');
   }
 
+  // 마지막 화면에서 참여자 번호를 한 번 더 확인한다(시작 때 비워 두고 온 초안도 여기서 채운다)
+  const isLast = () => d.step === GS.PARTS.length - 1;
+  const pnumCard = () => `<div class="card q" data-q="_pnum"><div class="qtext">참여자 번호 확인${PNUM_REQUIRED ? '' : ' (선택)'}</div>
+    <p class="small ink2" style="margin-top:-4px">진행자가 알려 준 참여자 번호가 맞는지 확인해 주세요. 비어 있으면 입력해 주세요${PNUM_REQUIRED ? '(모르면 진행자에게 물어봐 주세요)' : ''}.</p>
+    <input id="pnum2" autocomplete="off" maxlength="12" placeholder="예: 7" style="max-width:200px" value="${esc(d.pnum || '')}"></div>`;
+
   $('questions').addEventListener('input', e => {
     const el = e.target;
+    if (el.id === 'pnum2') {
+      d.pnum = cleanPnum(el.value); save();
+      if (d.pnum) el.closest('.q').classList.remove('missing');
+      return;
+    }
     if (!el.name) return;
     if (el.type === 'radio') d.ans[el.name] = Number(el.value);
     else if (el.type === 'number') d.ans[el.name] = el.value ? Number(el.value) : null;
@@ -222,10 +250,15 @@
       q.classList.toggle('missing', !ok);
       if (!ok && !first) first = q;
     }
-    if (first) { $('form-err').textContent = '빠진 문항이 있습니다. 빨간 테두리 문항을 확인해 주세요.'; first.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    if (isLast() && PNUM_REQUIRED) {
+      const q = document.querySelector('.q[data-q="_pnum"]');
+      q.classList.toggle('missing', !d.pnum);
+      if (!d.pnum && !first) first = q;
+    }
+    if (first) { $('form-err').textContent = first.dataset.q === '_pnum' ? '참여자 번호를 입력해 주세요. 모르면 진행자에게 물어봐 주세요.' : '빠진 문항이 있습니다. 빨간 테두리 문항을 확인해 주세요.'; first.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     $('form-err').textContent = '';
     if (p.stage === 'pre') return sendPre();
-    if (d.step === GS.PARTS.length - 1) return sendPost();
+    if (isLast()) return sendPost();
     d.step++; save(); render();
   });
 
@@ -236,7 +269,7 @@
   async function sendPre() {
     busy(true, '저장 중…');
     try {
-      await GS_API.submit(code, d.pid, 'pre', { ...pick('pre'), _pnum: d.pnum || null, _consent_at: d.consentAt, _v: 1 });
+      await GS_API.submit(code, d.pid, 'pre', { ...pick('pre'), _pnum: d.pnum || null, _consent_at: d.consentAt, _v: 1, _items_v: stageV('pre') });
       d.preSent = true; d.step = 1; save(); render();
     } catch (err) {
       if (err.code === 'SESSION_CLOSED') return showMsg('설문이 종료되어 제출할 수 없습니다.');
@@ -247,7 +280,7 @@
     busy(true, '제출 중…');
     const usage = d.lockLeftAt && d.lockStart ? Math.round((d.lockLeftAt - d.lockStart) / 1000) : null;
     try {
-      await GS_API.submit(code, d.pid, 'post', { ...pick('post'), _pnum: d.pnum || null, _usage_sec: usage, _app_opened: d.appOpened || 0, _lock_started_at: d.lockStart ? new Date(d.lockStart).toISOString() : null, _v: 1 });
+      await GS_API.submit(code, d.pid, 'post', { ...pick('post'), _pnum: d.pnum || null, _usage_sec: usage, _app_opened: d.appOpened || 0, _lock_started_at: d.lockStart ? new Date(d.lockStart).toISOString() : null, _v: 1, _items_v: stageV('post') });
       store.set(doneKey(), true); store.del(draftKey());
       showDone();
     } catch (err) {

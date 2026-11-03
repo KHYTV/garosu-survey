@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>결과 · 우리동네가로수 사용성 평가</title>
-<link rel="stylesheet" href="assets/app.css?v=1">
+<link rel="stylesheet" href="assets/app.css?v=2">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="assets/config.js?v=1"></script>
-<script src="assets/items.js?v=1"></script>
-<script src="assets/stats.js?v=1"></script>
-<script src="assets/api.js?v=1"></script>
+<script src="assets/config.js?v=2"></script>
+<script src="assets/items.js?v=2"></script>
+<script src="assets/stats.js?v=2"></script>
+<script src="assets/api.js?v=2"></script>
 </head>
 <body class="leaf-bg">
 <main class="wrap">
@@ -53,6 +53,10 @@
     if (A.length < (GS_CONFIG.MIN_N || 3) && !key) return msg(`응답이 ${GS_CONFIG.MIN_N || 3}명 미만이라 결과를 공개하지 않습니다.`);
     $('sub').textContent = `${data.title || code} · 본 설문 ${A.length}명 · 시작 문항 ${pre.length}명 · ${data.status === 'closed' ? '종료' : '진행 중(진행자 보기)'}`;
     const sus = A.map(GS.score.sus), ueq = A.map(GS.score.ueq);
+    // 문구가 바뀐 문항이 있으면 버전별 응답 수를 함께 밝힌다
+    const changed = GS.ALL_ITEMS.filter(i => i.changed);
+    const postV = people.filter(m => m.post).map(m => GS_STATS.itemsV(m.post));
+    const verLine = changed.length ? `<p class="small muted">문구가 바뀐 문항: ${changed.map(i => `${esc(i.id)}(${i.no}번)`).join(', ')} — ${Object.keys(GS.ITEMS_VERSIONS).map(v => `버전 ${v} ${postV.filter(x => String(x) === v).length}명`).join(' · ')}. 버전 1은 이전 문구로 응답(${esc(GS.ITEMS_VERSIONS[1])}).</p>` : '';
     const html = [];
     html.push(`<section class="card"><h2>척도 점수 (평균 ± 표준편차)</h2>
       ${bar('SUS 사용성 점수 (0~100, 68 이상이 평균 이상)', mean(sus), 100, ` ± ${r2(sd(sus))}`)}
@@ -62,7 +66,7 @@
       ${bar('사용 용이성 PEOU (1~7)', mean(A.map(GS.score.peou)), 7, ` ± ${r2(sd(A.map(GS.score.peou)))}`)}
       ${bar('태도 ATT (1~7)', mean(A.map(GS.score.att)), 7, ` ± ${r2(sd(A.map(GS.score.att)))}`)}
       ${bar('지속 사용 의도 CI (1~7)', mean(A.map(GS.score.ci)), 7, ` ± ${r2(sd(A.map(GS.score.ci)))}`)}
-      <p class="small muted">UEQ-S 막대는 −3~+3을 0~6으로 옮겨 그린 것이고 오른쪽 숫자가 실제 값입니다.</p></section>`);
+      <p class="small muted">UEQ-S 막대는 −3~+3을 0~6으로 옮겨 그린 것이고 오른쪽 숫자가 실제 값입니다.</p>${verLine}</section>`);
     html.push(`<section class="card"><h2>과업별 난이도 SEQ (1 매우 어렵다 ~ 7 매우 쉽다)</h2>` +
       GS.TASKS.map((t, k) => { const v = A.map(a => a[`SEQ${k + 1}`]); const done = A.filter(a => a[`SEQ${k + 1}_done`] === 1).length;
         return bar(t.title, mean(v), 7, ` · 혼자 완료 ${A.length ? Math.round(done / A.length * 100) : 0}%`); }).join('') + '</section>');
